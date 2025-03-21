@@ -554,7 +554,7 @@ function getIndexHtml() {
       const messageInput = document.getElementById('message');
       const sendButton = document.getElementById('send-button');
       const chatLoading = document.getElementById('chat-loading');
-      const chatError = document.getElementById('chat-error');
+      const chatErrorElement = document.getElementById('chat-error');
       const chatMessages = document.getElementById('chat-messages');
       
       // Image Generation Form
@@ -679,7 +679,7 @@ function getIndexHtml() {
             const chunk = decoder.decode(value, { stream: true });
             
             // Parse SSE format
-            const lines = chunk.split('\\n');
+            const lines = chunk.split("\\n");
             for (const line of lines) {
               if (line.startsWith('data:')) {
                 try {
@@ -721,8 +721,8 @@ catch (error)
     chatMessages.removeChild(typingIndicator)
   }
 
-  chatError.textContent = error.message || "Failed to get response. Please try again."
-  chatError.style.display = "block"
+  chatErrorElement.textContent = error.message || "Failed to get response. Please try again."
+  chatErrorElement.style.display = "block"
 }
 finally
 {
