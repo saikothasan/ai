@@ -3,7 +3,7 @@ export interface Env {
   TELEGRAM_BOT_TOKEN: string // Add Telegram bot token to environment variables
 }
 
-const WORKER_URL = "https://ai.example.com" // Replace with your worker URL
+const WORKER_URL = "https://chat.oax.workers.dev" // Replace with your worker URL
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -1494,6 +1494,7 @@ promptInput.focus()
 })
 </script>
 </body>
-</html>`
+</html>
+`
 }
 
