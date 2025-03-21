@@ -1,13 +1,19 @@
 export interface Env {
   AI: any
+  TELEGRAM_BOT_TOKEN: string // Add Telegram bot token to environment variables
 }
 
-const WORKER_URL = "https://chat.oax.workers.dev" // Replace with your worker URL
+const WORKER_URL = "https://ai.example.com" // Replace with your worker URL
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname
+
+    // Handle Telegram webhook
+    if (path === "/telegram-webhook") {
+      return handleTelegramWebhook(request, env)
+    }
 
     // Handle image generation
     if (path === "/api/generate-image") {
@@ -26,6 +32,156 @@ export default {
       },
     })
   },
+}
+
+// Telegram bot handler
+async function handleTelegramWebhook(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 })
+  }
+
+  try {
+    const update = await request.json()
+
+    // Check if this is a message update
+    if (!update.message) {
+      return new Response("OK", { status: 200 })
+    }
+
+    const chatId = update.message.chat.id
+    const messageText = update.message.text || ""
+
+    // Check if this is a command
+    if (messageText.startsWith("/image") || messageText.startsWith("/img")) {
+      // Extract the prompt from the command
+      const prompt = messageText.replace(/^\/image\s+|^\/img\s+/, "").trim()
+
+      if (!prompt) {
+        await sendTelegramMessage(
+          env,
+          chatId,
+          "Please provide a description for the image. Example: /image a cat in space",
+        )
+        return new Response("OK", { status: 200 })
+      }
+
+      // Send a "generating" message
+      await sendTelegramMessage(env, chatId, "🎨 Generating your image...")
+
+      // Generate the image
+      try {
+        const imageResponse = await env.AI.run("@cf/stabilityai/stable-diffusion-xl-base-1.0", { prompt })
+
+        // Send the image back to the user
+        await sendTelegramPhoto(env, chatId, imageResponse, prompt)
+      } catch (error) {
+        await sendTelegramMessage(env, chatId, `Sorry, I couldn't generate that image: ${error}`)
+      }
+    } else if (messageText.startsWith("/start")) {
+      // Welcome message
+      await sendTelegramMessage(
+        env,
+        chatId,
+        "👋 Hello! I'm your AI assistant. I can chat with you or generate images.\n\n" +
+          "To chat, just send me a message.\n" +
+          "To generate an image, use the /image command followed by a description.\n\n" +
+          "Example: /image a futuristic city with flying cars",
+      )
+    } else if (messageText.startsWith("/help")) {
+      // Help message
+      await sendTelegramMessage(
+        env,
+        chatId,
+        "🤖 *AI Assistant Help*\n\n" +
+          "*Commands:*\n" +
+          "/start - Start the bot\n" +
+          "/help - Show this help message\n" +
+          "/image [description] - Generate an image based on your description\n" +
+          "/img [description] - Short version of the image command\n\n" +
+          "For chat, simply send any message that doesn't start with a command.",
+        "Markdown",
+      )
+    } else {
+      // This is a regular chat message
+      // Send a "thinking" message
+      await sendTelegramMessage(env, chatId, "🤔 Thinking...")
+
+      // Process the chat message
+      try {
+        const messages = [
+          { role: "system", content: "You are a helpful AI assistant." },
+          { role: "user", content: messageText },
+        ]
+
+        const response = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+          messages,
+          max_tokens: 2048, // Set max_tokens as requested
+        })
+
+        // Send the response back to the user
+        await sendTelegramMessage(env, chatId, response.response || "I don't know what to say.")
+      } catch (error) {
+        await sendTelegramMessage(env, chatId, `Sorry, I couldn't process that message: ${error}`)
+      }
+    }
+
+    return new Response("OK", { status: 200 })
+  } catch (error) {
+    return new Response(`Error processing Telegram webhook: ${error}`, { status: 500 })
+  }
+}
+
+// Helper function to send a message to Telegram
+async function sendTelegramMessage(
+  env: Env,
+  chatId: string | number,
+  text: string,
+  parseMode?: "Markdown" | "HTML",
+): Promise<void> {
+  const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`
+
+  const body: any = {
+    chat_id: chatId,
+    text: text,
+  }
+
+  if (parseMode) {
+    body.parse_mode = parseMode
+  }
+
+  await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
+}
+
+// Helper function to send a photo to Telegram
+async function sendTelegramPhoto(
+  env: Env,
+  chatId: string | number,
+  imageData: ArrayBuffer,
+  caption?: string,
+): Promise<void> {
+  const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendPhoto`
+
+  const formData = new FormData()
+  formData.append("chat_id", chatId.toString())
+
+  // Convert ArrayBuffer to Blob
+  const blob = new Blob([imageData], { type: "image/png" })
+  formData.append("photo", blob, "generated-image.png")
+
+  if (caption) {
+    formData.append("caption", caption)
+  }
+
+  await fetch(url, {
+    method: "POST",
+    body: formData,
+  })
 }
 
 async function handleImageGeneration(request: Request, env: Env): Promise<Response> {
@@ -76,10 +232,11 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
       { role: "user", content: message },
     ]
 
-    // Call the Llama model for chat with streaming enabled
+    // Call the Llama model for chat with streaming enabled and max_tokens set
     const stream = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
       messages,
       stream: true,
+      max_tokens: 2048, // Set max_tokens as requested
     })
 
     // Return the streaming response
@@ -111,8 +268,8 @@ function getIndexHtml() {
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="${WORKER_URL}">
-  <meta property="twitter:title" content="AI Assistant | Image Generation & Chat">
-  <meta property="twitter:description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
+  <meta property="og:title" content="AI Assistant | Image Generation & Chat">
+  <meta property="og:description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -770,6 +927,45 @@ function getIndexHtml() {
       transform: rotate(15deg);
     }
     
+    /* Telegram bot section */
+    .telegram-section {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px dashed var(--border);
+    }
+    
+    .telegram-info {
+      background-color: rgba(99, 102, 241, 0.05);
+      border-radius: var(--radius-sm);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .telegram-info h3 {
+      color: var(--primary);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .telegram-info p {
+      margin-bottom: 0.75rem;
+    }
+    
+    .telegram-info ul {
+      margin-left: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .telegram-info code {
+      background-color: rgba(99, 102, 241, 0.1);
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    
     /* Responsive adjustments */
     @media (max-width: 768px) {
       header h1 {
@@ -929,6 +1125,27 @@ function getIndexHtml() {
           <span id="error-text">An error occurred. Please try again.</span>
         </div>
       </form>
+      
+      <div class="telegram-section">
+        <div class="telegram-info">
+          <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2l-19 19"></path>
+              <path d="M21.5 2l-9 22-3-11-8-8z"></path>
+            </svg>
+            Telegram Bot Integration
+          </h3>
+          <p>This AI Assistant is also available as a Telegram bot! You can chat and generate images directly from Telegram.</p>
+          <p><strong>Commands:</strong></p>
+          <ul>
+            <li><code>/start</code> - Start the bot</li>
+            <li><code>/help</code> - Show help information</li>
+            <li><code>/image [description]</code> - Generate an image</li>
+            <li><code>/img [description]</code> - Short version of the image command</li>
+          </ul>
+          <p>For regular chat, simply send a message to the bot.</p>
+        </div>
+      </div>
     </section>
   </main>
   
@@ -1002,10 +1219,10 @@ function getIndexHtml() {
   // Update button text and placeholder
   buttonText.textContent = mode === "chat" ? "Send Message" : "Generate Image"
   promptInput.placeholder = mode === "chat" ? "Ask me anything..." : "Describe the image you want to generate..."
-  \
 }
 )
-})
+\
+      })
 
 // Suggestion buttons
 suggestions.forEach((suggestion) =>
