@@ -20,11 +20,14 @@ export default {
     }
 
     // Return simple HTML interface for testing
-    return new Response(getIndexHtml(), {
-      headers: {
-        "content-type": "text/html;charset=UTF-8",
+    return new Response(
+      getIndexHtml(),
+      {
+        headers: {
+          "content-type": "text/html;charset=UTF-8",
+        },
       },
-    })
+    )
   },
 }
 
@@ -111,8 +114,8 @@ function getIndexHtml() {
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="${WORKER_URL}">
-  <meta property="og:title" content="AI Assistant | Image Generation & Chat">
-  <meta property="og:description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
+  <meta property="twitter:title" content="AI Assistant | Image Generation & Chat">
+  <meta property="twitter:description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -554,7 +557,7 @@ function getIndexHtml() {
       const messageInput = document.getElementById('message');
       const sendButton = document.getElementById('send-button');
       const chatLoading = document.getElementById('chat-loading');
-      const chatErrorElement = document.getElementById('chat-error');
+      const chatError = document.getElementById('chat-error');
       const chatMessages = document.getElementById('chat-messages');
       
       // Image Generation Form
@@ -627,13 +630,7 @@ function getIndexHtml() {
         // Create typing indicator
         const typingIndicator = document.createElement('div');
         typingIndicator.className = 'typing-indicator';
-        typingIndicator.innerHTML = `
-  \
-          <div
-  class="typing-dot"></div>
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-        `;
+        typingIndicator.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
         chatMessages.appendChild(typingIndicator);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         
@@ -679,7 +676,7 @@ function getIndexHtml() {
             const chunk = decoder.decode(value, { stream: true });
             
             // Parse SSE format
-            const lines = chunk.split("\\n");
+            const lines = chunk.split(/\\r?\\n/);
             for (const line of lines) {
               if (line.startsWith('data:')) {
                 try {
@@ -692,7 +689,7 @@ function getIndexHtml() {
                     if (jsonData.response) {
                       responseText += jsonData.response;
                     }
-                  } catch {
+                  } catch (parseError) {
                     // If not JSON, just append the data
                     responseText += data;
                   }
@@ -711,41 +708,37 @@ function getIndexHtml() {
           if (!responseText.trim()) {
             assistantMessage.textContent = "I'm sorry, I couldn't generate a response. Please try again.";
           }
-}
-catch (error)
-{
-  console.error("Error in chat:", error)
-
-  // Remove typing indicator if it exists
-  if (chatMessages.contains(typingIndicator)) {
-    chatMessages.removeChild(typingIndicator)
-  }
-
-  chatErrorElement.textContent = error.message || "Failed to get response. Please try again."
-  chatErrorElement.style.display = "block"
-}
-finally
-{
-  sendButton.disabled = false
-  chatMessages.scrollTop = chatMessages.scrollHeight
-}
-})
-
-// Helper function to add messages to the chat
-function addMessage(text, sender) {
-  const messageElement = document.createElement("div")
-  messageElement.classList.add("message", sender, "fade-in")
-  messageElement.textContent = text
-
-  chatMessages.appendChild(messageElement)
-  chatMessages.scrollTop = chatMessages.scrollHeight
-}
-
-// Focus inputs on page load
-promptInput.focus()
-})
-</script>
+          
+        } catch (error) {
+          console.error('Error in chat:', error);
+          
+          // Remove typing indicator if it exists
+          if (chatMessages.contains(typingIndicator)) {
+            chatMessages.removeChild(typingIndicator);
+          }
+          
+          chatError.textContent = error.message || 'Failed to get response. Please try again.';
+          chatError.style.display = 'block';
+        } finally {
+          sendButton.disabled = false;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+      });
+      
+      // Helper function to add messages to the chat
+      function addMessage(text, sender) {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message', sender, 'fade-in');
+        messageElement.textContent = text;
+        
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+      
+      // Focus inputs on page load
+      promptInput.focus();
+    });
+  </script>
 </body>
-</html>`
+</html>`;
 }
-
