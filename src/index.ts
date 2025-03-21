@@ -2,147 +2,36 @@ export interface Env {
   AI: any
 }
 
+const WORKER_URL = "https://chat.oax.workers.dev" // Replace with your worker URL
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname
 
     // Handle image generation
-    if (path === "/generate-image") {
+    if (path === "/api/generate-image") {
       return handleImageGeneration(request, env)
     }
 
     // Handle chat
-    if (path === "/chat") {
+    if (path === "/api/chat") {
       return handleChat(request, env)
     }
 
     // Return simple HTML interface for testing
-    return new Response(
-      `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>AI Worker</title>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <script src="https://cdn.tailwindcss.com"></script>
-        </head>
-        <body class="bg-gray-100 min-h-screen p-8">
-          <div class="max-w-4xl mx-auto">
-            <h1 class="text-3xl font-bold mb-8">Cloudflare AI Worker</h1>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <!-- Image Generation -->
-              <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold mb-4">Image Generation</h2>
-                <div class="mb-4">
-                  <label class="block text-sm font-medium mb-1">Prompt</label>
-                  <input id="imagePrompt" type="text" class="w-full p-2 border rounded" value="cyberpunk cat">
-                </div>
-                <button id="generateBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Generate Image</button>
-                <div class="mt-4">
-                  <img id="generatedImage" class="mt-4 max-w-full h-auto hidden">
-                </div>
-              </div>
-              
-              <!-- Chat -->
-              <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold mb-4">AI Chat</h2>
-                <div id="chatMessages" class="mb-4 h-64 overflow-y-auto border rounded p-3"></div>
-                <div class="flex">
-                  <input id="chatInput" type="text" class="flex-1 p-2 border rounded-l" placeholder="Ask something...">
-                  <button id="chatBtn" class="bg-green-500 text-white px-4 py-2 rounded-r hover:bg-green-600">Send</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <script>
-            // Image generation
-            document.getElementById('generateBtn').addEventListener('click', async () => {
-              const prompt = document.getElementById('imagePrompt').value;
-              const img = document.getElementById('generatedImage');
-              
-              img.classList.add('hidden');
-              document.getElementById('generateBtn').textContent = 'Generating...';
-              
-              try {
-                const response = await fetch('/generate-image', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ prompt })
-                });
-                
-                if (response.ok) {
-                  const blob = await response.blob();
-                  const url = URL.createObjectURL(blob);
-                  img.src = url;
-                  img.classList.remove('hidden');
-                } else {
-                  alert('Error generating image');
-                }
-              } catch (error) {
-                alert('Error: ' + error);
-              }
-              
-              document.getElementById('generateBtn').textContent = 'Generate Image';
-            });
-            
-            // Chat
-            document.getElementById('chatBtn').addEventListener('click', async () => {
-              const input = document.getElementById('chatInput');
-              const message = input.value.trim();
-              if (!message) return;
-              
-              addMessage('user', message);
-              input.value = '';
-              
-              try {
-                const response = await fetch('/chat', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ message })
-                });
-                
-                if (response.ok) {
-                  const data = await response.json();
-                  addMessage('assistant', data.response);
-                } else {
-                  addMessage('system', 'Error: Could not get response');
-                }
-              } catch (error) {
-                addMessage('system', 'Error: ' + error);
-              }
-            });
-            
-            function addMessage(role, content) {
-              const chatMessages = document.getElementById('chatMessages');
-              const messageEl = document.createElement('div');
-              messageEl.className = 'mb-2 p-2 rounded ' + 
-                (role === 'user' ? 'bg-blue-100 ml-8' : 
-                 role === 'assistant' ? 'bg-green-100 mr-8' : 'bg-red-100');
-              messageEl.textContent = content;
-              chatMessages.appendChild(messageEl);
-              chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-          </script>
-        </body>
-      </html>
-      `,
-      {
-        headers: {
-          "content-type": "text/html;charset=UTF-8",
-        },
+    return new Response(getIndexHtml(), {
+      headers: {
+        "content-type": "text/html;charset=UTF-8",
       },
-    )
+    })
   },
 }
 
 async function handleImageGeneration(request: Request, env: Env): Promise<Response> {
   // Only accept POST requests for image generation
   if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 })
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 })
   }
 
   try {
@@ -150,7 +39,7 @@ async function handleImageGeneration(request: Request, env: Env): Promise<Respon
     const { prompt } = await request.json()
 
     if (!prompt) {
-      return new Response("Prompt is required", { status: 400 })
+      return new Response(JSON.stringify({ error: "Prompt is required" }), { status: 400 })
     }
 
     // Call the Stability AI model to generate an image
@@ -163,14 +52,14 @@ async function handleImageGeneration(request: Request, env: Env): Promise<Respon
       },
     })
   } catch (error) {
-    return new Response(`Error generating image: ${error}`, { status: 500 })
+    return new Response(JSON.stringify({ error: `Error generating image: ${error}` }), { status: 500 })
   }
 }
 
 async function handleChat(request: Request, env: Env): Promise<Response> {
   // Only accept POST requests for chat
   if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 })
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 })
   }
 
   try {
@@ -178,7 +67,7 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
     const { message } = await request.json()
 
     if (!message) {
-      return new Response("Message is required", { status: 400 })
+      return new Response(JSON.stringify({ error: "Message is required" }), { status: 400 })
     }
 
     // Call the Llama model for chat
@@ -196,7 +85,544 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
       },
     })
   } catch (error) {
-    return new Response(`Error in chat: ${error}`, { status: 500 })
+    return new Response(JSON.stringify({ error: `Error in chat: ${error}` }), { status: 500 })
   }
+}
+
+function getIndexHtml() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Assistant | Image Generation & Chat</title>
+  <meta name="description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${WORKER_URL}">
+  <meta property="og:title" content="AI Assistant | Image Generation & Chat">
+  <meta property="og:description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="${WORKER_URL}">
+  <meta property="twitter:title" content="AI Assistant | Image Generation & Chat">
+  <meta property="twitter:description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --secondary: #10b981;
+      --secondary-dark: #059669;
+      --background: #f9fafb;
+      --card-bg: #ffffff;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --border: #e5e7eb;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --radius: 0.5rem;
+      --transition: all 0.2s ease;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #6366f1;
+        --primary-dark: #4f46e5;
+        --secondary: #10b981;
+        --secondary-dark: #059669;
+        --background: #111827;
+        --card-bg: #1f2937;
+        --text: #f9fafb;
+        --text-light: #d1d5db;
+        --border: #374151;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      }
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: var(--background);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 0;
+      margin: 0;
+      min-height: 100vh;
+    }
+    
+    header {
+      background: linear-gradient(to right, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 1.5rem 0;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    
+    header p {
+      font-size: 1rem;
+      opacity: 0.9;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    main {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    
+    @media (min-width: 768px) {
+      main {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    
+    .card {
+      background-color: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      transition: var(--transition);
+    }
+    
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    h2 svg {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+    
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    label {
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+    
+    input, textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background-color: var(--card-bg);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 1rem;
+      transition: var(--transition);
+    }
+    
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+    
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    button:hover {
+      background-color: var(--primary-dark);
+    }
+    
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    
+    .button-secondary {
+      background-color: var(--secondary);
+    }
+    
+    .button-secondary:hover {
+      background-color: var(--secondary-dark);
+    }
+    
+    .result {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .result-image {
+      width: 100%;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      max-height: 400px;
+      object-fit: contain;
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+    
+    .chat-messages {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-height: 400px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+    
+    .message {
+      padding: 1rem;
+      border-radius: var(--radius);
+      max-width: 85%;
+    }
+    
+    .message.user {
+      background-color: var(--primary);
+      color: white;
+      align-self: flex-end;
+    }
+    
+    .message.assistant {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+    }
+    
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 1rem 0;
+      color: var(--text-light);
+    }
+    
+    .loading-spinner {
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    
+    .error {
+      color: #ef4444;
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-light);
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.5s ease-in;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 640px) {
+      header h1 {
+        font-size: 1.5rem;
+      }
+      
+      header p {
+        font-size: 0.875rem;
+      }
+      
+      .card {
+        padding: 1rem;
+      }
+      
+      h2 {
+        font-size: 1.25rem;
+      }
+      
+      button {
+        padding: 0.625rem 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI Assistant</h1>
+    <p>Generate images with Stability AI and chat with Llama 3.3</p>
+  </header>
+  
+  <main>
+    <section class="card">
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+        Image Generation
+      </h2>
+      <form id="image-form">
+        <div>
+          <label for="prompt">Describe the image you want to generate</label>
+          <textarea id="prompt" name="prompt" placeholder="A serene landscape with mountains and a lake at sunset..." required></textarea>
+        </div>
+        <button type="submit" id="generate-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          Generate Image
+        </button>
+        <div id="image-loading" class="loading" style="display: none;">
+          <div class="loading-spinner"></div>
+          <span>Generating your image...</span>
+        </div>
+        <div id="image-error" class="error" style="display: none;"></div>
+      </form>
+      <div id="image-result" class="result" style="display: none;">
+        <img id="generated-image" class="result-image" alt="Generated image based on your prompt" />
+        <button id="download-image" class="button-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Download Image
+        </button>
+      </div>
+    </section>
+    
+    <section class="card">
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        AI Chat
+      </h2>
+      <div id="chat-messages" class="chat-messages">
+        <div class="message assistant fade-in">
+          Hello! I'm your AI assistant powered by Llama 3.3. How can I help you today?
+        </div>
+      </div>
+      <form id="chat-form">
+        <div>
+          <label for="message">Your message</label>
+          <textarea id="message" name="message" placeholder="Ask me anything..." required></textarea>
+        </div>
+        <button type="submit" id="send-button">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          Send Message
+        </button>
+        <div id="chat-loading" class="loading" style="display: none;">
+          <div class="loading-spinner"></div>
+          <span>Thinking...</span>
+        </div>
+        <div id="chat-error" class="error" style="display: none;"></div>
+      </form>
+    </section>
+  </main>
+  
+  <footer>
+    <p>Powered by Cloudflare Workers, Stability AI, and Meta's Llama 3.3</p>
+    <p>&copy; ${new Date().getFullYear()} - All rights reserved</p>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Image Generation
+      const imageForm = document.getElementById('image-form');
+      const promptInput = document.getElementById('prompt');
+      const generateButton = document.getElementById('generate-button');
+      const imageLoading = document.getElementById('image-loading');
+      const imageError = document.getElementById('image-error');
+      const imageResult = document.getElementById('image-result');
+      const generatedImage = document.getElementById('generated-image');
+      const downloadImage = document.getElementById('download-image');
+      
+      // Chat
+      const chatForm = document.getElementById('chat-form');
+      const messageInput = document.getElementById('message');
+      const sendButton = document.getElementById('send-button');
+      const chatLoading = document.getElementById('chat-loading');
+      const chatError = document.getElementById('chat-error');
+      const chatMessages = document.getElementById('chat-messages');
+      
+      // Image Generation Form
+      imageForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const prompt = promptInput.value.trim();
+        if (!prompt) return;
+        
+        // Show loading state
+        generateButton.disabled = true;
+        imageLoading.style.display = 'flex';
+        imageError.style.display = 'none';
+        imageResult.style.display = 'none';
+        
+        try {
+          const response = await fetch('/api/generate-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ prompt }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to generate image');
+          }
+          
+          const blob = await response.blob();
+          const imageUrl = URL.createObjectURL(blob);
+          
+          generatedImage.src = imageUrl;
+          imageResult.style.display = 'flex';
+          
+          // Setup download button
+          downloadImage.onclick = () => {
+            const a = document.createElement('a');
+            a.href = imageUrl;
+            a.download = 'generated-image.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          };
+          
+        } catch (error) {
+          console.error('Error generating image:', error);
+          imageError.textContent = error.message || 'Failed to generate image. Please try again.';
+          imageError.style.display = 'block';
+        } finally {
+          generateButton.disabled = false;
+          imageLoading.style.display = 'none';
+        }
+      });
+      
+      // Chat Form
+      chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const message = messageInput.value.trim();
+        if (!message) return;
+        
+        // Add user message to chat
+        addMessage(message, 'user');
+        messageInput.value = '';
+        
+        // Show loading state
+        sendButton.disabled = true;
+        chatLoading.style.display = 'flex';
+        chatError.style.display = 'none';
+        
+        try {
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to get response');
+          }
+          
+          const data = await response.json();
+          addMessage(data.response, 'assistant');
+          
+        } catch (error) {
+          console.error('Error in chat:', error);
+          chatError.textContent = error.message || 'Failed to get response. Please try again.';
+          chatError.style.display = 'block';
+        } finally {
+          sendButton.disabled = false;
+          chatLoading.style.display = 'none';
+        }
+      });
+      
+      // Helper function to add messages to the chat
+      function addMessage(text, sender) {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message', sender, 'fade-in');
+        messageElement.textContent = text;
+        
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+      
+      // Focus inputs on page load
+      promptInput.focus();
+    });
+  </script>
+</body>
+</html>`
 }
 
