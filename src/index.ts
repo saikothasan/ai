@@ -20,14 +20,11 @@ export default {
     }
 
     // Return simple HTML interface for testing
-    return new Response(
-      getIndexHtml(),
-      {
-        headers: {
-          "content-type": "text/html;charset=UTF-8",
-        },
+    return new Response(getIndexHtml(), {
+      headers: {
+        "content-type": "text/html;charset=UTF-8",
       },
-    )
+    })
   },
 }
 
@@ -190,18 +187,9 @@ function getIndexHtml() {
     }
     
     main {
-      max-width: 1200px;
+      max-width: 800px;
       margin: 2rem auto;
       padding: 0 1rem;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 2rem;
-    }
-    
-    @media (min-width: 768px) {
-      main {
-        grid-template-columns: 1fr 1fr;
-      }
     }
     
     .card {
@@ -243,7 +231,7 @@ function getIndexHtml() {
       display: block;
     }
     
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       padding: 0.75rem;
       border: 1px solid var(--border);
@@ -255,7 +243,7 @@ function getIndexHtml() {
       transition: var(--transition);
     }
     
-    input:focus, textarea:focus {
+    input:focus, textarea:focus, select:focus {
       outline: none;
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
@@ -341,6 +329,19 @@ function getIndexHtml() {
       background-color: var(--card-bg);
       border: 1px solid var(--border);
       align-self: flex-start;
+    }
+    
+    .message.image {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+      max-width: 100%;
+      padding: 0.5rem;
+    }
+    
+    .message.image img {
+      width: 100%;
+      border-radius: calc(var(--radius) - 0.25rem);
     }
     
     .loading {
@@ -432,6 +433,29 @@ function getIndexHtml() {
       }
     }
     
+    .mode-selector {
+      margin-bottom: 1rem;
+    }
+    
+    .download-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background-color: var(--secondary);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    
+    .download-button:hover {
+      background-color: var(--secondary-dark);
+    }
+    
     /* Responsive adjustments */
     @media (max-width: 640px) {
       header h1 {
@@ -459,78 +483,52 @@ function getIndexHtml() {
 <body>
   <header>
     <h1>AI Assistant</h1>
-    <p>Generate images with Stability AI and chat with Llama 3.3</p>
+    <p>Chat and generate images with AI</p>
   </header>
   
   <main>
     <section class="card">
       <h2>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-          <polyline points="21 15 16 10 5 21"></polyline>
-        </svg>
-        Image Generation
-      </h2>
-      <form id="image-form">
-        <div>
-          <label for="prompt">Describe the image you want to generate</label>
-          <textarea id="prompt" name="prompt" placeholder="A serene landscape with mountains and a lake at sunset..." required></textarea>
-        </div>
-        <button type="submit" id="generate-button">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-          Generate Image
-        </button>
-        <div id="image-loading" class="loading" style="display: none;">
-          <div class="loading-spinner"></div>
-          <span>Generating your image...</span>
-        </div>
-        <div id="image-error" class="error" style="display: none;"></div>
-      </form>
-      <div id="image-result" class="result" style="display: none;">
-        <img id="generated-image" class="result-image" alt="Generated image based on your prompt" />
-        <button id="download-image" class="button-secondary">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          Download Image
-        </button>
-      </div>
-    </section>
-    
-    <section class="card">
-      <h2>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
-        AI Chat
+        AI Assistant
       </h2>
+      
       <div id="chat-messages" class="chat-messages">
         <div class="message assistant fade-in">
-          Hello! I'm your AI assistant powered by Llama 3.3. How can I help you today?
+          Hello! I'm your AI assistant. I can chat with you or generate images. How can I help you today?
         </div>
       </div>
-      <form id="chat-form">
-        <div>
-          <label for="message">Your message</label>
-          <textarea id="message" name="message" placeholder="Ask me anything..." required></textarea>
+      
+      <form id="ai-form">
+        <div class="mode-selector">
+          <label for="mode">Choose mode:</label>
+          <select id="mode" name="mode">
+            <option value="chat">Chat</option>
+            <option value="image">Generate Image</option>
+          </select>
         </div>
-        <button type="submit" id="send-button">
+        
+        <div>
+          <label for="prompt">Your message</label>
+          <textarea id="prompt" name="prompt" placeholder="Ask me anything or describe an image to generate..." required></textarea>
+        </div>
+        
+        <button type="submit" id="submit-button">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="22" y1="2" x2="11" y2="13"></line>
             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
           </svg>
-          Send Message
+          <span id="button-text">Send Message</span>
         </button>
-        <div id="chat-loading" class="loading" style="display: none;">
+        
+        <div id="loading" class="loading" style="display: none;">
           <div class="loading-spinner"></div>
-          <span>Thinking...</span>
+          <span id="loading-text">Thinking...</span>
         </div>
-        <div id="chat-error" class="error" style="display: none;"></div>
+        
+        <div id="error" class="error" style="display: none;"></div>
       </form>
     </section>
   </main>
@@ -542,203 +540,237 @@ function getIndexHtml() {
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // Image Generation
-      const imageForm = document.getElementById('image-form');
+      // Elements
+      const aiForm = document.getElementById('ai-form');
+      const modeSelect = document.getElementById('mode');
       const promptInput = document.getElementById('prompt');
-      const generateButton = document.getElementById('generate-button');
-      const imageLoading = document.getElementById('image-loading');
-      const imageError = document.getElementById('image-error');
-      const imageResult = document.getElementById('image-result');
-      const generatedImage = document.getElementById('generated-image');
-      const downloadImage = document.getElementById('download-image');
-      
-      // Chat
-      const chatForm = document.getElementById('chat-form');
-      const messageInput = document.getElementById('message');
-      const sendButton = document.getElementById('send-button');
-      const chatLoading = document.getElementById('chat-loading');
-      const chatError = document.getElementById('chat-error');
+      const submitButton = document.getElementById('submit-button');
+      const buttonText = document.getElementById('button-text');
+      const loading = document.getElementById('loading');
+      const loadingText = document.getElementById('loading-text');
+      const error = document.getElementById('error');
       const chatMessages = document.getElementById('chat-messages');
       
-      // Image Generation Form
-      imageForm.addEventListener('submit', async (e) => {
+      // Update button text based on mode
+      modeSelect.addEventListener('change', () => {
+        const mode = modeSelect.value;
+        buttonText.textContent = mode === 'chat' ? 'Send Message' : 'Generate Image';
+        promptInput.placeholder = mode === 'chat' 
+          ? 'Ask me anything...' 
+          : 'Describe the image you want to generate...';
+      });
+      
+      // Form submission
+      aiForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        const mode = modeSelect.value;
         const prompt = promptInput.value.trim();
+        
         if (!prompt) return;
         
         // Show loading state
-        generateButton.disabled = true;
-        imageLoading.style.display = 'flex';
-        imageError.style.display = 'none';
-        imageResult.style.display = 'none';
-        
-        try {
-          const response = await fetch('/api/generate-image', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ prompt }),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to generate image');
-          }
-          
-          const blob = await response.blob();
-          const imageUrl = URL.createObjectURL(blob);
-          
-          generatedImage.src = imageUrl;
-          imageResult.style.display = 'flex';
-          
-          // Setup download button
-          downloadImage.onclick = () => {
-            const a = document.createElement('a');
-            a.href = imageUrl;
-            a.download = 'generated-image.png';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          };
-          
-        } catch (error) {
-          console.error('Error generating image:', error);
-          imageError.textContent = error.message || 'Failed to generate image. Please try again.';
-          imageError.style.display = 'block';
-        } finally {
-          generateButton.disabled = false;
-          imageLoading.style.display = 'none';
-        }
-      });
-      
-      // Chat Form
-      chatForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const message = messageInput.value.trim();
-        if (!message) return;
+        submitButton.disabled = true;
+        loading.style.display = 'flex';
+        loadingText.textContent = mode === 'chat' ? 'Thinking...' : 'Generating image...';
+        error.style.display = 'none';
         
         // Add user message to chat
-        addMessage(message, 'user');
-        messageInput.value = '';
-        
-        // Show loading state
-        sendButton.disabled = true;
-        
-        // Create typing indicator
-        const typingIndicator = document.createElement('div');
-        typingIndicator.className = 'typing-indicator';
-        typingIndicator.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
-        chatMessages.appendChild(typingIndicator);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        addMessage(prompt, 'user');
+        promptInput.value = '';
         
         try {
-          // Create a new message element for the assistant's response
-          const assistantMessage = document.createElement('div');
-          assistantMessage.classList.add('message', 'assistant', 'fade-in');
-          assistantMessage.style.display = 'none'; // Hide initially
-          
-          // Fetch the streaming response
-          const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ message }),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to get response');
+          if (mode === 'chat') {
+            await handleChatRequest(prompt);
+          } else {
+            await handleImageRequest(prompt);
           }
-          
-          // Process the streaming response
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let responseText = '';
-          
-          // Remove typing indicator and show the message element
-          chatMessages.removeChild(typingIndicator);
-          assistantMessage.style.display = 'block';
-          chatMessages.appendChild(assistantMessage);
-          
-          // Read the stream
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) {
-              break;
-            }
-            
-            // Decode the chunk and update the UI
-            const chunk = decoder.decode(value, { stream: true });
-            
-            // Parse SSE format
-            const lines = chunk.split(/\\r?\\n/);
-            for (const line of lines) {
-              if (line.startsWith('data:')) {
-                try {
-                  const data = line.substring(5).trim();
-                  if (data === '[DONE]') continue;
-                  
-                  // Try to parse as JSON
-                  try {
-                    const jsonData = JSON.parse(data);
-                    if (jsonData.response) {
-                      responseText += jsonData.response;
-                    }
-                  } catch (parseError) {
-                    // If not JSON, just append the data
-                    responseText += data;
-                  }
-                  
-                  // Update the message content
-                  assistantMessage.textContent = responseText;
-                  chatMessages.scrollTop = chatMessages.scrollHeight;
-                } catch (e) {
-                  console.error('Error parsing SSE data:', e);
-                }
-              }
-            }
-          }
-          
-          // If no text was received, show a fallback message
-          if (!responseText.trim()) {
-            assistantMessage.textContent = "I'm sorry, I couldn't generate a response. Please try again.";
-          }
-          
-        } catch (error) {
-          console.error('Error in chat:', error);
-          
-          // Remove typing indicator if it exists
-          if (chatMessages.contains(typingIndicator)) {
-            chatMessages.removeChild(typingIndicator);
-          }
-          
-          chatError.textContent = error.message || 'Failed to get response. Please try again.';
-          chatError.style.display = 'block';
-        } finally {
-          sendButton.disabled = false;
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-      });
-      
-      // Helper function to add messages to the chat
-      function addMessage(text, sender) {
-        const messageElement = document.createElement('div');
-        messageElement.classList.add('message', sender, 'fade-in');
-        messageElement.textContent = text;
-        
-        chatMessages.appendChild(messageElement);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
-      
-      // Focus inputs on page load
-      promptInput.focus();
-    });
-  </script>
-</body>
-</html>`;
+        } catch (err) {
+          console.error(\`Error in ${mode} request:\`, err);
+          error.textContent = err.message || \`Failed to ${mode === "chat" ? "get response" : "generate image"}. Please try again.`
+  error.style.display = "block"
+  \
 }
+finally
+{
+  submitButton.disabled = false
+  loading.style.display = "none"
+  chatMessages.scrollTop = chatMessages.scrollHeight
+}
+})
+
+// Handle chat request
+async
+function handleChatRequest(message) {
+  // Create typing indicator
+  const typingIndicator = document.createElement("div")
+  typingIndicator.className = "typing-indicator"
+  typingIndicator.innerHTML =
+    '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>'
+  chatMessages.appendChild(typingIndicator)
+  chatMessages.scrollTop = chatMessages.scrollHeight
+
+  // Create a new message element for the assistant's response
+  const assistantMessage = document.createElement("div")
+  assistantMessage.classList.add("message", "assistant", "fade-in")
+  assistantMessage.style.display = "none" // Hide initially
+
+  try {
+    // Fetch the streaming response
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || "Failed to get response")
+    }
+
+    // Process the streaming response
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let responseText = ""
+
+    // Remove typing indicator and show the message element
+    chatMessages.removeChild(typingIndicator)
+    assistantMessage.style.display = "block"
+    chatMessages.appendChild(assistantMessage)
+
+    // Read the stream
+    while (true) {
+      const { done, value } = await reader.read()
+
+      if (done) {
+        break
+      }
+
+      // Decode the chunk and update the UI
+      const chunk = decoder.decode(value, { stream: true })
+
+      // Parse SSE format
+      const lines = chunk.split(/\\r?\\n/)
+      for (const line of lines) {
+        if (line.startsWith("data:")) {
+          try {
+            const data = line.substring(5).trim()
+            if (data === "[DONE]") continue
+
+            // Try to parse as JSON
+            try {
+              const jsonData = JSON.parse(data)
+              if (jsonData.response) {
+                responseText += jsonData.response
+              }
+            } catch (parseError) {
+              // If not JSON, just append the data
+              responseText += data
+            }
+
+            // Update the message content
+            assistantMessage.textContent = responseText
+            chatMessages.scrollTop = chatMessages.scrollHeight
+          } catch (e) {
+            console.error("Error parsing SSE data:", e)
+          }
+        }
+      }
+    }
+
+    // If no text was received, show a fallback message
+    if (!responseText.trim()) {
+      assistantMessage.textContent = "I'm sorry, I couldn't generate a response. Please try again."
+    }
+  } catch (error) {
+    // Remove typing indicator if it exists
+    if (chatMessages.contains(typingIndicator)) {
+      chatMessages.removeChild(typingIndicator)
+    }
+    throw error
+  }
+}
+
+// Handle image request
+async function handleImageRequest(prompt) {
+  try {
+    const response = await fetch("/api/generate-image", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || "Failed to generate image")
+    }
+
+    const blob = await response.blob()
+    const imageUrl = URL.createObjectURL(blob)
+
+    // Create image message container
+    const imageContainer = document.createElement("div")
+    imageContainer.className = "message image fade-in"
+
+    // Create image element
+    const img = document.createElement("img")
+    img.src = imageUrl
+    img.alt = "Generated image: " + prompt
+    img.className = "result-image"
+
+    // Create download button
+    const downloadButton = document.createElement("button")
+    downloadButton.className = "download-button"
+    downloadButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download Image
+          `
+
+    // Add download functionality
+    downloadButton.addEventListener("click", () => {
+      const a = document.createElement("a")
+      a.href = imageUrl
+      a.download = "generated-image.png"
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    })
+
+    // Add elements to container
+    imageContainer.appendChild(img)
+    imageContainer.appendChild(downloadButton)
+
+    // Add to chat
+    chatMessages.appendChild(imageContainer)
+    chatMessages.scrollTop = chatMessages.scrollHeight
+  } catch (error) {
+    throw error
+  }
+}
+
+// Helper function to add messages to the chat
+function addMessage(text, sender) {
+  const messageElement = document.createElement("div")
+  messageElement.classList.add("message", sender, "fade-in")
+  messageElement.textContent = text
+
+  chatMessages.appendChild(messageElement)
+  chatMessages.scrollTop = chatMessages.scrollHeight
+}
+
+// Focus input on page load
+promptInput.focus()
+})
+</script>
+</body>
+</html>`
+}
+
