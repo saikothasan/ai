@@ -70,18 +70,22 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
       return new Response(JSON.stringify({ error: "Message is required" }), { status: 400 })
     }
 
-    // Call the Llama model for chat
-    const response = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
-      messages: [
-        { role: "system", content: "You are a helpful AI assistant." },
-        { role: "user", content: message },
-      ],
+    // Set up messages for the chat
+    const messages = [
+      { role: "system", content: "You are a helpful AI assistant." },
+      { role: "user", content: message },
+    ]
+
+    // Call the Llama model for chat with streaming enabled
+    const stream = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+      messages,
+      stream: true,
     })
 
-    // Return the chat response
-    return new Response(JSON.stringify({ response: response.response }), {
+    // Return the streaming response
+    return new Response(stream, {
       headers: {
-        "content-type": "application/json",
+        "content-type": "text/event-stream",
       },
     })
   } catch (error) {
@@ -107,8 +111,8 @@ function getIndexHtml() {
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="${WORKER_URL}">
-  <meta property="twitter:title" content="AI Assistant | Image Generation & Chat">
-  <meta property="twitter:description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
+  <meta property="og:title" content="AI Assistant | Image Generation & Chat">
+  <meta property="og:description" content="AI-powered image generation and chat assistant using Stability AI and Llama models">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -384,6 +388,47 @@ function getIndexHtml() {
       to { opacity: 1; transform: translateY(0); }
     }
     
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius);
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+      margin-top: 0.5rem;
+    }
+    
+    .typing-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      background-color: var(--text-light);
+      border-radius: 50%;
+      animation: typingAnimation 1.4s infinite ease-in-out;
+    }
+    
+    .typing-dot:nth-child(1) {
+      animation-delay: 0s;
+    }
+    
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    
+    @keyframes typingAnimation {
+      0%, 60%, 100% {
+        transform: translateY(0);
+      }
+      30% {
+        transform: translateY(-0.25rem);
+      }
+    }
+    
     /* Responsive adjustments */
     @media (max-width: 640px) {
       header h1 {
@@ -578,10 +623,27 @@ function getIndexHtml() {
         
         // Show loading state
         sendButton.disabled = true;
-        chatLoading.style.display = 'flex';
-        chatError.style.display = 'none';
+        
+        // Create typing indicator
+        const typingIndicator = document.createElement('div');
+        typingIndicator.className = 'typing-indicator';
+        typingIndicator.innerHTML = `
+  \
+          <div
+  class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        `;
+        chatMessages.appendChild(typingIndicator);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
         
         try {
+          // Create a new message element for the assistant's response
+          const assistantMessage = document.createElement('div');
+          assistantMessage.classList.add('message', 'assistant', 'fade-in');
+          assistantMessage.style.display = 'none'; // Hide initially
+          
+          // Fetch the streaming response
           const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
@@ -595,33 +657,94 @@ function getIndexHtml() {
             throw new Error(errorData.error || 'Failed to get response');
           }
           
-          const data = await response.json();
-          addMessage(data.response, 'assistant');
+          // Process the streaming response
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let responseText = '';
           
-        } catch (error) {
-          console.error('Error in chat:', error);
-          chatError.textContent = error.message || 'Failed to get response. Please try again.';
-          chatError.style.display = 'block';
-        } finally {
-          sendButton.disabled = false;
-          chatLoading.style.display = 'none';
-        }
-      });
-      
-      // Helper function to add messages to the chat
-      function addMessage(text, sender) {
-        const messageElement = document.createElement('div');
-        messageElement.classList.add('message', sender, 'fade-in');
-        messageElement.textContent = text;
-        
-        chatMessages.appendChild(messageElement);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
-      
-      // Focus inputs on page load
-      promptInput.focus();
-    });
-  </script>
+          // Remove typing indicator and show the message element
+          chatMessages.removeChild(typingIndicator);
+          assistantMessage.style.display = 'block';
+          chatMessages.appendChild(assistantMessage);
+          
+          // Read the stream
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              break;
+            }
+            
+            // Decode the chunk and update the UI
+            const chunk = decoder.decode(value, { stream: true });
+            
+            // Parse SSE format
+            const lines = chunk.split('\\n');
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                try {
+                  const data = line.substring(5).trim();
+                  if (data === '[DONE]') continue;
+                  
+                  // Try to parse as JSON
+                  try {
+                    const jsonData = JSON.parse(data);
+                    if (jsonData.response) {
+                      responseText += jsonData.response;
+                    }
+                  } catch {
+                    // If not JSON, just append the data
+                    responseText += data;
+                  }
+                  
+                  // Update the message content
+                  assistantMessage.textContent = responseText;
+                  chatMessages.scrollTop = chatMessages.scrollHeight;
+                } catch (e) {
+                  console.error('Error parsing SSE data:', e);
+                }
+              }
+            }
+          }
+          
+          // If no text was received, show a fallback message
+          if (!responseText.trim()) {
+            assistantMessage.textContent = "I'm sorry, I couldn't generate a response. Please try again.";
+          }
+}
+catch (error)
+{
+  console.error("Error in chat:", error)
+
+  // Remove typing indicator if it exists
+  if (chatMessages.contains(typingIndicator)) {
+    chatMessages.removeChild(typingIndicator)
+  }
+
+  chatError.textContent = error.message || "Failed to get response. Please try again."
+  chatError.style.display = "block"
+}
+finally
+{
+  sendButton.disabled = false
+  chatMessages.scrollTop = chatMessages.scrollHeight
+}
+})
+
+// Helper function to add messages to the chat
+function addMessage(text, sender) {
+  const messageElement = document.createElement("div")
+  messageElement.classList.add("message", sender, "fade-in")
+  messageElement.textContent = text
+
+  chatMessages.appendChild(messageElement)
+  chatMessages.scrollTop = chatMessages.scrollHeight
+}
+
+// Focus inputs on page load
+promptInput.focus()
+})
+</script>
 </body>
 </html>`
 }
